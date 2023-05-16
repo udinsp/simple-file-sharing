@@ -106,7 +106,21 @@ const server = http.createServer((req, res) => {
   }
 });
 
+var os = require('os');
+var networkInterfaces = Object.values(os.networkInterfaces())
+  .reduce((r, a) => {
+    r = r.concat(a);
+    return r;
+  }, [])
+  .filter(({ family, address }) => {
+    return family.toLowerCase().indexOf('v4') >= 0 &&
+      address !== '127.0.0.1' &&
+      address.startsWith('192.168');
+  })
+  .map(({ address }) => address);
+var ipAddresses = networkInterfaces.join(', ');
+
 // Mendengarkan pada port 80
 server.listen(80, () => {
-  console.log('Server is running on http://localhost:80');
+  console.log('Server is running on http://localhost or http://' + ipAddresses);
 });
