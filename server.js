@@ -149,7 +149,7 @@ app.get('/', basicAuth, (req, res) => {
               <tbody>
                 ${fileList.map(f => `
                 <tr>
-                  <td>${f.name}</td>
+                  <td>${f.name.replace(/</g, '<').replace(/>/g, '>')}</td>
                   <td>${f.sizeFormatted}</td>
                   <td class="hide-mobile">${f.modified.toLocaleDateString()}</td>
                   <td><a href="/download/${encodeURIComponent(f.name)}">⬇️ Download</a></td>
