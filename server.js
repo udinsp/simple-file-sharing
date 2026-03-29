@@ -271,7 +271,7 @@ app.use((err, req, res, next) => {
       LIMIT_UNEXPECTED_FILE: 'Unexpected file field',
     };
     const message = multerMessages[err.code] || `Upload error: ${err.code}`;
-    return res.status(400).json({ error: message });
+    return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: message });
   }
   console.error(err);
   res.status(500).json({ error: 'Internal server error' });
