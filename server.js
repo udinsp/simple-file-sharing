@@ -43,7 +43,9 @@ function basicAuth(req, res, next) {
 
   const base64Credentials = authHeader.split(' ')[1];
   const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
-  const [username, password] = credentials.split(':');
+  const separatorIndex = credentials.indexOf(':');
+  const username = credentials.substring(0, separatorIndex);
+  const password = credentials.substring(separatorIndex + 1);
 
   if (username === AUTH_USER && password === AUTH_PASS) {
     return next();
@@ -192,7 +194,7 @@ app.post('/upload', basicAuth, upload.single('file'), (req, res) => {
 
 // GET /download/:filename — Download file (safe path)
 app.get('/download/:filename', basicAuth, (req, res) => {
-  const filename = sanitizeFilename(decodeURIComponent(req.params.filename));
+  const filename = sanitizeFilename(req.params.filename);
   const filePath = path.resolve(FILES_DIR, filename);
 
   // Security: prevent path traversal using resolved canonical paths
