@@ -9,6 +9,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
@@ -68,7 +69,8 @@ const storage = multer.diskStorage({
     if (fs.existsSync(filePath)) {
       const ext = path.extname(safeName);
       const base = path.basename(safeName, ext);
-      cb(null, `${base}_${Date.now()}${ext}`);
+      const unique = `${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      cb(null, `${base}_${unique}${ext}`);
     } else {
       cb(null, safeName);
     }
