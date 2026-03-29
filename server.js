@@ -9,6 +9,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
@@ -42,6 +43,10 @@ function basicAuth(req, res, next) {
   }
 
   const base64Credentials = authHeader.split(' ')[1];
+  if (!base64Credentials) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="File Server"');
+    return res.status(401).json({ error: 'Malformed authorization header' });
+  }
   const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
   const separatorIndex = credentials.indexOf(':');
   const username = credentials.substring(0, separatorIndex);
@@ -60,7 +65,15 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, FILES_DIR),
   filename: (req, file, cb) => {
     const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    cb(null, safeName);
+    const filePath = path.join(FILES_DIR, safeName);
+    if (fs.existsSync(filePath)) {
+      const ext = path.extname(safeName);
+      const base = path.basename(safeName, ext);
+      const unique = `${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      cb(null, `${base}_${unique}${ext}`);
+    } else {
+      cb(null, safeName);
+    }
   }
 });
 
@@ -195,6 +208,11 @@ app.post('/upload', basicAuth, upload.single('file'), (req, res) => {
 // GET /download/:filename — Download file (safe path)
 app.get('/download/:filename', basicAuth, (req, res) => {
   const filename = sanitizeFilename(req.params.filename);
+
+  if (!filename) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+
   const filePath = path.resolve(FILES_DIR, filename);
 
   // Security: prevent path traversal using resolved canonical paths
@@ -246,9 +264,16 @@ app.use((req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(413).json({ error: 'File too large (max 100MB)' });
-    }
+    const multerMessages = {
+      LIMIT_FILE_SIZE: 'File too large (max 100MB)',
+      LIMIT_FILE_COUNT: 'Too many files uploaded',
+      LIMIT_FIELD_KEY: 'Field name too long',
+      LIMIT_FIELD_VALUE: 'Field value too long',
+      LIMIT_FIELD_COUNT: 'Too many fields',
+      LIMIT_UNEXPECTED_FILE: 'Unexpected file field',
+    };
+    const message = multerMessages[err.code] || `Upload error: ${err.code}`;
+    return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: message });
   }
   console.error(err);
   res.status(500).json({ error: 'Internal server error' });
