@@ -73,6 +73,16 @@ function sanitizeFilename(filename) {
   return sanitized;
 }
 
+// Helper: escape HTML entities to prevent XSS
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Helper: format file size
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
@@ -89,14 +99,19 @@ app.get('/', basicAuth, (req, res) => {
     }
 
     const fileList = files.map(file => {
-      const stats = fs.statSync(path.join(FILES_DIR, file));
-      return {
-        name: file,
-        size: stats.size,
-        sizeFormatted: formatSize(stats.size),
-        modified: stats.mtime
-      };
-    }).sort((a, b) => b.modified - a.modified);
+      try {
+        const stats = fs.statSync(path.join(FILES_DIR, file));
+        return {
+          name: file,
+          size: stats.size,
+          sizeFormatted: formatSize(stats.size),
+          modified: stats.mtime
+        };
+      } catch (e) {
+        // File may have been deleted between readdir and stat
+        return null;
+      }
+    }).filter(Boolean).sort((a, b) => b.modified - a.modified);
 
     const html = `
       <!DOCTYPE html>
@@ -149,7 +164,7 @@ app.get('/', basicAuth, (req, res) => {
               <tbody>
                 ${fileList.map(f => `
                 <tr>
-                  <td>${f.name.replace(/</g, '<').replace(/>/g, '>')}</td>
+                  <td>${escapeHtml(f.name)}</td>
                   <td>${f.sizeFormatted}</td>
                   <td class="hide-mobile">${f.modified.toLocaleDateString()}</td>
                   <td><a href="/download/${encodeURIComponent(f.name)}">⬇️ Download</a></td>
@@ -178,10 +193,10 @@ app.post('/upload', basicAuth, upload.single('file'), (req, res) => {
 // GET /download/:filename — Download file (safe path)
 app.get('/download/:filename', basicAuth, (req, res) => {
   const filename = sanitizeFilename(decodeURIComponent(req.params.filename));
-  const filePath = path.join(FILES_DIR, filename);
+  const filePath = path.resolve(FILES_DIR, filename);
 
-  // Security: prevent path traversal
-  if (!filePath.startsWith(FILES_DIR)) {
+  // Security: prevent path traversal using resolved canonical paths
+  if (!filePath.startsWith(path.resolve(FILES_DIR) + path.sep) && filePath !== path.resolve(FILES_DIR)) {
     return res.status(403).json({ error: 'Access denied' });
   }
 
@@ -204,13 +219,18 @@ app.get('/api/files', basicAuth, (req, res) => {
     }
 
     const fileList = files.map(file => {
-      const stats = fs.statSync(path.join(FILES_DIR, file));
-      return {
-        name: file,
-        size: stats.size,
-        modified: stats.mtime
-      };
-    });
+      try {
+        const stats = fs.statSync(path.join(FILES_DIR, file));
+        return {
+          name: file,
+          size: stats.size,
+          modified: stats.mtime
+        };
+      } catch (e) {
+        // File may have been deleted between readdir and stat
+        return null;
+      }
+    }).filter(Boolean);
 
     res.json({ files: fileList, count: fileList.length });
   });
@@ -244,5 +264,5 @@ app.listen(PORT, () => {
   networkInterfaces.forEach(ip => {
     console.log(`   Network: http://${ip}:${PORT}`);
   });
-  console.log(`   Auth:    ${AUTH_USER} / ${AUTH_PASS}`);
+  console.log(`   Auth:    enabled (Basic Auth)`);
 });
