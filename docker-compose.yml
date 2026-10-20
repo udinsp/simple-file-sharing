@@ -2,11 +2,23 @@ services:
   file-server:
     build: .
     ports:
-      - "${PORT:-3000}:3000"
+      - "${PORT:-3000}:${PORT:-3000}"
     environment:
-      - PORT=3000
+      - PORT=${PORT:-3000}
       - AUTH_USER=${AUTH_USER:-admin}
       - AUTH_PASS=${AUTH_PASS:-changeme}
+      - NODE_ENV=production
+      - TRUST_PROXY=${TRUST_PROXY:-}
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
     volumes:
       - ./files:/app/files
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${PORT:-3000}/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

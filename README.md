@@ -1,4 +1,4 @@
-# Simple File Sharing Server v2.0
+# Simple File Sharing Server v2.1
 
 A simple file sharing server built with Express.js. Supports file uploads, downloads, and comes with basic security features.
 
@@ -38,8 +38,15 @@ Create a `.env` file from `.env.example`:
 
 ```env
 PORT=3000           # Server port (default: 3000)
-AUTH_USER=admin     # Login username
-AUTH_PASS=changeme  # Login password
+AUTH_USER=admin     # Login username (change in production)
+AUTH_PASS=changeme  # Login password (change in production)
+TRUST_PROXY=        # Set when behind a reverse proxy (e.g. 1)
+COOKIE_SECURE=false # Set true when served over HTTPS
+AUTH_USERS=         # Optional: user:pass,user2:pass2 (overrides AUTH_USER/AUTH_PASS)
+MAX_STORAGE_MB=     # Optional storage quota (0 = unlimited)
+ALLOWED_EXTENSIONS= # Optional comma list, e.g. .pdf,.txt,.png
+BLOCKED_EXTENSIONS= # Optional comma list of blocked extensions
+SHARE_DEFAULT_HOURS=24
 ```
 
 ## 📡 API Endpoints
@@ -69,6 +76,23 @@ AUTH_PASS=changeme  # Login password
 - **dotenv** — Environment config
 
 ## 📝 Changelog
+
+### v2.2.0 (phase 1: tests, health, delete)
+- Added `/health` and `/ready` endpoints
+- Added file delete endpoint/UI with CSRF protection
+- Added search/sort/pagination query params to `/api/files`
+- Added Jest/Supertest-free Node test suite (10 tests) and Docker hardening
+- Bumped version to 2.2.0
+
+### v2.1.0 (security hardening)
+- Upgraded multer to 2.x and express to 4.22+
+- Added Helmet security headers (CSP, X-Frame-Options, nosniff)
+- Replaced string password comparison with constant-time comparison
+- Embedded CSRF protection for browser uploads (double-submit + SameSite cookie)
+- Added safer filename/path handling (realpath + traversal guard)
+- Async filesystem operations and safer error handling
+- Conditional HSTS, configurable trust proxy for reverse proxies
+- Default-credential warning / production guard
 
 ### v2.0.0
 - Migrated from `http` to Express.js
